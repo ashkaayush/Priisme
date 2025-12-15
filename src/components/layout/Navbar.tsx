@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { User as SupabaseUser } from "@supabase/supabase-js";
+import { CartDrawer } from "@/components/cart/CartDrawer";
 
 const navLinks = [
   { name: "AI Styling", href: "/ai-styling" },
@@ -76,6 +77,7 @@ export function Navbar() {
 
           {/* Desktop Auth Buttons */}
           <div className="hidden md:flex items-center gap-3">
+            <CartDrawer />
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
