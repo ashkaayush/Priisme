@@ -1,150 +1,237 @@
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { PhotoUpload } from "@/components/ai-styling/PhotoUpload";
+import { StyleResults } from "@/components/ai-styling/StyleResults";
 import { Button } from "@/components/ui/button";
-import { Camera, Sparkles, ArrowRight, CheckCircle, Lock } from "lucide-react";
-import { Link } from "react-router-dom";
-
-const features = [
-  "Face shape analysis",
-  "Skin tone detection",
-  "Body proportions",
-  "Personal color palette",
-  "Style personality",
-  "Hair recommendations",
-];
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Sparkles, ArrowRight, Lock, RefreshCw } from "lucide-react";
 
 export default function AIStyling() {
+  const { user, loading } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [previousAnalyses, setPreviousAnalyses] = useState<any[]>([]);
+
+  // Fetch previous analyses
+  useEffect(() => {
+    if (user) {
+      fetchPreviousAnalyses();
+    }
+  }, [user]);
+
+  const fetchPreviousAnalyses = async () => {
+    const { data, error } = await supabase
+      .from("style_analyses")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (!error && data) {
+      setPreviousAnalyses(data);
+      // Set the most recent analysis if available
+      if (data.length > 0 && !analysis) {
+        setAnalysis(data[0].full_analysis);
+      }
+    }
+  };
+
+  const handlePhotoSelect = async (base64: string) => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to use AI Style Analysis",
+        variant: "destructive",
+      });
+      navigate("/auth");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysis(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-style", {
+        body: { imageBase64: base64 },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const analysisResult = data.analysis;
+      setAnalysis(analysisResult);
+
+      // Save to database
+      const { error: saveError } = await supabase.from("style_analyses").insert({
+        user_id: user.id,
+        photo_url: "stored_locally", // We don't store the actual photo for privacy
+        face_shape: analysisResult.face_shape,
+        skin_tone: analysisResult.skin_tone,
+        skin_undertone: analysisResult.skin_undertone,
+        body_type: analysisResult.body_type,
+        recommended_colors: analysisResult.recommended_colors,
+        avoid_colors: analysisResult.avoid_colors,
+        style_personality: analysisResult.style_personality,
+        clothing_recommendations: analysisResult.clothing_recommendations,
+        hairstyle_recommendations: analysisResult.hairstyle_recommendations,
+        makeup_recommendations: analysisResult.makeup_recommendations,
+        full_analysis: analysisResult,
+      });
+
+      if (saveError) {
+        console.error("Failed to save analysis:", saveError);
+      } else {
+        fetchPreviousAnalyses();
+      }
+
+      toast({
+        title: "Analysis Complete!",
+        description: "Your personalized style profile is ready.",
+      });
+    } catch (error: any) {
+      console.error("Analysis error:", error);
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Please try again with a different photo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const startNewAnalysis = () => {
+    setAnalysis(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ai"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <Navbar />
       <main className="pt-16">
         {/* Hero */}
-        <section className="py-24 bg-gradient-hero">
+        <section className="py-12 bg-gradient-hero">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-ai/10 border border-ai/20 mb-8">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-ai/10 border border-ai/20 mb-6">
                 <Sparkles className="w-4 h-4 text-ai" />
-                <span className="text-sm font-medium">Powered by Advanced AI</span>
+                <span className="text-sm font-medium">AI-Powered Analysis</span>
               </div>
 
-              <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-                AI Style <span className="text-gradient-ai">Analysis</span>
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+                {analysis ? "Your Style Profile" : "Discover Your Style"}
               </h1>
 
-              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-                Upload your photo and let our AI analyze your unique features to create a personalized style profile just for you.
+              <p className="text-muted-foreground max-w-xl mx-auto">
+                {analysis
+                  ? "Based on AI analysis of your photo"
+                  : "Upload a photo and let our AI create your personalized style profile"}
               </p>
-
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-                <Button size="lg" className="w-full sm:w-auto gap-2 bg-ai hover:bg-ai/90" asChild>
-                  <Link to="/auth?mode=signup">
-                    Get Started
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </Button>
-              </div>
             </div>
           </div>
         </section>
 
-        {/* What we analyze */}
-        <section className="py-24 bg-secondary/30">
+        {/* Main Content */}
+        <section className="py-12">
           <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-              <div>
-                <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                  What Our AI Analyzes
-                </h2>
-                <p className="text-lg text-muted-foreground mb-8">
-                  Using advanced computer vision and machine learning, we analyze multiple aspects of your appearance to provide accurate, personalized recommendations.
+            {!user ? (
+              // Not logged in
+              <div className="max-w-md mx-auto text-center">
+                <div className="w-20 h-20 mx-auto rounded-full bg-ai/10 flex items-center justify-center mb-6">
+                  <Lock className="w-10 h-10 text-ai" />
+                </div>
+                <h2 className="text-2xl font-bold mb-4">Sign In Required</h2>
+                <p className="text-muted-foreground mb-8">
+                  Create a free account to access AI Style Analysis and save your results.
                 </p>
-
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-3">
-                      <CheckCircle className="w-5 h-5 text-ai flex-shrink-0" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="relative">
-                <div className="aspect-square rounded-2xl bg-card border border-border p-8 flex flex-col items-center justify-center">
-                  <div className="w-24 h-24 rounded-full bg-ai/10 flex items-center justify-center mb-6">
-                    <Camera className="w-12 h-12 text-ai" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">Upload Your Photo</h3>
-                  <p className="text-muted-foreground text-center mb-6">
-                    Your photos are processed securely and never shared
-                  </p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Lock className="w-4 h-4" />
-                    <span>End-to-end encrypted</span>
-                  </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button size="lg" asChild>
+                    <Link to="/auth?mode=signup">
+                      Get Started Free
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Link>
+                  </Button>
+                  <Button size="lg" variant="outline" asChild>
+                    <Link to="/auth">Sign In</Link>
+                  </Button>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* How it works */}
-        <section className="py-24">
-          <div className="container mx-auto px-4">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                How It Works
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Three simple steps to unlock your personalized style profile
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-              {[
-                {
-                  step: "1",
-                  title: "Upload Photo",
-                  description: "Take or upload a clear photo of yourself",
-                },
-                {
-                  step: "2",
-                  title: "AI Analysis",
-                  description: "Our AI analyzes your unique features",
-                },
-                {
-                  step: "3",
-                  title: "Get Results",
-                  description: "Receive your personalized style profile",
-                },
-              ].map((item) => (
-                <div key={item.step} className="text-center">
-                  <div className="w-12 h-12 mx-auto rounded-full bg-ai text-ai-foreground flex items-center justify-center font-bold text-lg mb-4">
-                    {item.step}
-                  </div>
-                  <h3 className="font-semibold mb-2">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground">{item.description}</p>
+            ) : analysis ? (
+              // Show results
+              <div className="max-w-4xl mx-auto">
+                <div className="flex justify-end mb-6">
+                  <Button variant="outline" onClick={startNewAnalysis} className="gap-2">
+                    <RefreshCw className="w-4 h-4" />
+                    New Analysis
+                  </Button>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
+                <StyleResults analysis={analysis} />
+              </div>
+            ) : (
+              // Upload photo
+              <div className="max-w-2xl mx-auto">
+                <PhotoUpload
+                  onPhotoSelect={handlePhotoSelect}
+                  isAnalyzing={isAnalyzing}
+                />
+                
+                <div className="mt-8 p-4 rounded-xl bg-secondary/50 border border-border">
+                  <div className="flex items-start gap-3">
+                    <Lock className="w-5 h-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm">Your Privacy Matters</p>
+                      <p className="text-sm text-muted-foreground">
+                        Your photos are processed securely and never stored on our servers. 
+                        Only the analysis results are saved to your profile.
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-        {/* CTA */}
-        <section className="py-24 bg-ai text-ai-foreground">
-          <div className="container mx-auto px-4 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Ready to Discover Your Style?
-            </h2>
-            <p className="text-lg text-ai-foreground/80 mb-8 max-w-2xl mx-auto">
-              Join thousands of users who have transformed their look with AI-powered styling.
-            </p>
-            <Button size="lg" variant="secondary" className="gap-2" asChild>
-              <Link to="/auth?mode=signup">
-                Get Started Free
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </Button>
+                {previousAnalyses.length > 0 && (
+                  <div className="mt-8">
+                    <h3 className="font-medium mb-4">Previous Analyses</h3>
+                    <div className="space-y-3">
+                      {previousAnalyses.slice(0, 3).map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => setAnalysis(item.full_analysis)}
+                          className="w-full p-4 rounded-xl bg-card border border-border hover:border-ai/50 transition-colors text-left"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium capitalize">{item.style_personality} Style</p>
+                              <p className="text-sm text-muted-foreground">
+                                {new Date(item.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
       </main>
