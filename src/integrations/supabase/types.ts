@@ -14,7 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      style_analyses: {
+        Row: {
+          avoid_colors: Json | null
+          body_type: string | null
+          clothing_recommendations: Json | null
+          created_at: string
+          face_shape: string | null
+          full_analysis: Json | null
+          hairstyle_recommendations: Json | null
+          id: string
+          makeup_recommendations: Json | null
+          photo_url: string
+          recommended_colors: Json | null
+          skin_tone: string | null
+          skin_undertone: string | null
+          style_personality: string | null
+          user_id: string
+        }
+        Insert: {
+          avoid_colors?: Json | null
+          body_type?: string | null
+          clothing_recommendations?: Json | null
+          created_at?: string
+          face_shape?: string | null
+          full_analysis?: Json | null
+          hairstyle_recommendations?: Json | null
+          id?: string
+          makeup_recommendations?: Json | null
+          photo_url: string
+          recommended_colors?: Json | null
+          skin_tone?: string | null
+          skin_undertone?: string | null
+          style_personality?: string | null
+          user_id: string
+        }
+        Update: {
+          avoid_colors?: Json | null
+          body_type?: string | null
+          clothing_recommendations?: Json | null
+          created_at?: string
+          face_shape?: string | null
+          full_analysis?: Json | null
+          hairstyle_recommendations?: Json | null
+          id?: string
+          makeup_recommendations?: Json | null
+          photo_url?: string
+          recommended_colors?: Json | null
+          skin_tone?: string | null
+          skin_undertone?: string | null
+          style_personality?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
